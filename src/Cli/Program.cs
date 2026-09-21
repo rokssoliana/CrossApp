@@ -6,7 +6,7 @@ Console.OutputEncoding = Encoding.UTF8;
 EnvironmentReport report = EnvironmentInfo.Collect();
 
 Console.WriteLine("CrossApp - інформація про середовище");
-Console.WriteLine(new string('-', 52));
+Console.WriteLine(new string('-', 55));
 Console.WriteLine($"OC              : {report.OsDescription}");
 Console.WriteLine($"Runtime         : {report.FrameworkDescription}");
 Console.WriteLine($"Архітектура     : {report.ProcessArchitecture}");
