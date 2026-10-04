@@ -9,7 +9,29 @@ if (!File.Exists(path))
     return 1;
 }
 
-// Додаткове завдання 1: вибір парсера за розширенням файлу через switch
+// Якщо запущено з файлом mixed.csv - використовуємо змішаний імпортер
+if (Path.GetFileName(path).Equals("mixed.csv", StringComparison.OrdinalIgnoreCase))
+{
+    MixedImportResult mixed = MixedCsvImporter.Load(path);
+    Console.WriteLine($"=== ЗМІШАНИЙ ІМПОРТ ===");
+    Console.WriteLine($"Складів завантажено : {mixed.Warehouses.Count}");
+    foreach (var w in mixed.Warehouses)
+        Console.WriteLine($"  [Склад] {w.Id,-6} {w.Name,-20} ({w.Location})");
+
+    Console.WriteLine($"Товарів завантажено : {mixed.Products.Count}");
+    foreach (var p in mixed.Products)
+        Console.WriteLine($"  [Товар] {p.Id,-6} {p.Sku,-10} {p.Name,-28} {p.Quantity,4} {p.Unit}");
+
+    if (mixed.Errors.Count > 0)
+    {
+        Console.WriteLine($"Помилок розбору : {mixed.Errors.Count}");
+        foreach (var err in mixed.Errors)
+            Console.WriteLine($"  ! {err}");
+    }
+    return 0;
+}
+
+// Інакше стандартний вибір парсера за розширенням
 ImportResult<ProductDto> result = Path.GetExtension(path).ToLowerInvariant() switch
 {
     ".csv" => ProductCsvImporter.Load(path),
@@ -32,7 +54,6 @@ if (result.Errors.Count > 0)
     }
 }
 
-// Додаткове завдання 3: підсумкова статистика імпорту одним рядком
 int total = result.Items.Count + result.Errors.Count;
 double errorPercent = total > 0 ? ((double)result.Errors.Count / total) * 100 : 0;
 Console.WriteLine(new string('-', 55));
