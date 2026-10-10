@@ -1,62 +1,60 @@
-﻿using Core.Dto;
+﻿using Core.Domain;
+using Core.Dto;
 using Core.Import;
 
-string path = args.Length > 0 ? args[0] : Path.Combine("data", "sample.csv");
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-if (!File.Exists(path))
+Console.WriteLine("==================================================");
+Console.WriteLine("  Сценарій 1: Успішна робота з доменною сутністю");
+Console.WriteLine("==================================================");
+
+Product product = Product.Create("P-001", "sku-001", "Цемент М400 25кг", "шт", 100);
+Console.WriteLine($"Створено об'єкт   : {product}");
+
+product.RegisterArrival(50);
+Console.WriteLine($"Після приходу (+50): {product}");
+
+product.Issue(30);
+Console.WriteLine($"Після видачі (-30) : {product}");
+
+Console.WriteLine("\n==================================================");
+Console.WriteLine("  Сценарій 2: Захист інваріантів (try/catch)");
+Console.WriteLine("==================================================");
+
+TryDo("Видача більша за залишок", () => product.Issue(1000));
+TryDo("Порожній SKU", () => Product.Create("P-002", "   ", "Пісок", "т", 10));
+TryDo("Від'ємний початковий залишок", () => Product.Create("P-003", "SKU-003", "Цегла", "шт", -15));
+TryDo("Нульовий прихід", () => product.RegisterArrival(0));
+
+Console.WriteLine($"\nСтан об'єкта після спроб порушення інваріантів: {product}");
+
+Console.WriteLine("\n==================================================");
+Console.WriteLine("  Додаткове завдання: DTO -> Domain конвертація");
+Console.WriteLine("==================================================");
+
+string csvPath = Path.Combine("data", "sample.csv");
+if (File.Exists(csvPath))
 {
-    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
-    return 1;
-}
+    ImportResult<ProductDto> csvResult = ProductCsvImporter.Load(csvPath);
+    var domainResult = ProductDomainConverter.Convert(csvResult);
 
-// Якщо запущено з файлом mixed.csv - використовуємо змішаний імпортер
-if (Path.GetFileName(path).Equals("mixed.csv", StringComparison.OrdinalIgnoreCase))
-{
-    MixedImportResult mixed = MixedCsvImporter.Load(path);
-    Console.WriteLine($"=== ЗМІШАНИЙ ІМПОРТ ===");
-    Console.WriteLine($"Складів завантажено : {mixed.Warehouses.Count}");
-    foreach (var w in mixed.Warehouses)
-        Console.WriteLine($"  [Склад] {w.Id,-6} {w.Name,-20} ({w.Location})");
-
-    Console.WriteLine($"Товарів завантажено : {mixed.Products.Count}");
-    foreach (var p in mixed.Products)
-        Console.WriteLine($"  [Товар] {p.Id,-6} {p.Sku,-10} {p.Name,-28} {p.Quantity,4} {p.Unit}");
-
-    if (mixed.Errors.Count > 0)
+    Console.WriteLine($"Успішно валідовано та створено сутностей: {domainResult.Entities.Count}");
+    Console.WriteLine($"Всього помилок (синтаксис CSV + інваріанти): {domainResult.InvariantErrors.Count}");
+    foreach (var err in domainResult.InvariantErrors.Take(3))
     {
-        Console.WriteLine($"Помилок розбору : {mixed.Errors.Count}");
-        foreach (var err in mixed.Errors)
-            Console.WriteLine($"  ! {err}");
-    }
-    return 0;
-}
-
-// Інакше стандартний вибір парсера за розширенням
-ImportResult<ProductDto> result = Path.GetExtension(path).ToLowerInvariant() switch
-{
-    ".csv" => ProductCsvImporter.Load(path),
-    ".json" => ProductJsonImporter.Load(path),
-    var ext => throw new NotSupportedException($"Формат файлу '{ext}' не підтримується")
-};
-
-Console.WriteLine($"Завантажено записів: {result.Items.Count}");
-foreach (ProductDto p in result.Items.Take(5))
-{
-    Console.WriteLine($"  {p.Id,-6} {p.Sku,-10} {p.Name,-28} {p.Quantity,5} {p.Unit}");
-}
-
-if (result.Errors.Count > 0)
-{
-    Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
-    foreach (string e in result.Errors)
-    {
-        Console.WriteLine($"  ! {e}");
+        Console.WriteLine($"  ! {err}");
     }
 }
 
-int total = result.Items.Count + result.Errors.Count;
-double errorPercent = total > 0 ? ((double)result.Errors.Count / total) * 100 : 0;
-Console.WriteLine(new string('-', 55));
-Console.WriteLine($"Статистика: Усього: {total} | Прийнято: {result.Items.Count} | Помилок: {result.Errors.Count} ({errorPercent:F1}%)");
-
-return 0;
+static void TryDo(string title, Action action)
+{
+    try
+    {
+        action();
+        Console.WriteLine($"[Провал] {title}: інваріант не спрацював!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Захищено] {title}: {ex.GetType().Name} -> {ex.Message}");
+    }
+}
