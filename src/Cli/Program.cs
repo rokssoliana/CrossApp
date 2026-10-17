@@ -1,6 +1,6 @@
 ﻿using Core;
 using Core.Abstractions;
-using Core.Domain;
+using Core.Events;
 using Core.Services;
 using Core.Storage;
 
@@ -21,55 +21,60 @@ Console.WriteLine("==================================================");
 Console.WriteLine($"  Сховище: {store.GetType().Name}");
 Console.WriteLine("==================================================");
 
-// === 2. СЦЕНАРІЙ РОБОТИ ===
-Console.WriteLine("\n--- 1. Додавання нового товару та операція приходу ---");
-var created = service.Add("SKU-999", "Кабель UTP cat6", "м", 50);
-Console.WriteLine($"Створено: [{created.Id}] {created.Name} - {created.Quantity} {created.Unit}");
+// === 2. НАЛАШТУВАННЯ ЛОГУВАННЯ ТА ПІДПИСНИКІВ ===
+var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+var logPath = Path.Combine(logDir, "app.log");
+Directory.CreateDirectory(logDir);
 
-service.Receive(created.Id, 25);
-var updated = service.Find(created.Id);
-Console.WriteLine($"Після приходу (+25): [{updated!.Id}] {updated.Name} - {updated.Quantity} {updated.Unit}");
-
-Console.WriteLine("\n--- 2. Поточний список товарів у каталозі ---");
-foreach (var p in service.All().Take(6))
+// Підписник 1: Локальний метод (виведення в консоль і запис у logs/app.log)
+void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
 {
-    Console.WriteLine($"  {p.Id,-8} {p.Sku,-10} {p.Name,-28} {p.Quantity,5} {p.Unit}");
+    var sign = e.Delta >= 0 ? $"+{e.Delta}" : $"{e.Delta}";
+    var line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {sign,4} залишок {e.QuantityAfter}";
+    Console.WriteLine($"  [Event] {line}");
+    File.AppendAllText(logPath, line + Environment.NewLine);
 }
-Console.WriteLine($"  ... Всього записів у каталозі: {service.All().Count}");
 
-// === 3. СЦЕНАРІЇ ВІДМОВИ (try/catch) ===
-Console.WriteLine("\n--- 3. Сценарії відмови (обробка помилок) ---");
+// Підписник 2: Лямбда-вираз із замиканням над локальною змінною
+int changes = 0;
+EventHandler<CatalogChangedEventArgs> counterHandler = (_, _) => changes++;
 
-// Спроба додати запис із дублікатом id
-TryDo("Спроба додати товар з існуючим Id", () =>
+// Підписка обох обробників
+service.Changed += OnCatalogChanged;
+service.Changed += counterHandler;
+
+// === 3. ОСНОВНИЙ СЦЕНАРІЙ (ДОДАВАННЯ ТА ЗМІНА СТАНУ) ===
+Console.WriteLine("\n--- 1. Виконання операцій з активною підпискою ---");
+var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
+service.Receive(created.Id, 25);
+Console.WriteLine($"Подій отримано лічильником: {changes}");
+
+// === 4. ВІДПИСКА (ДЕМОНСТРАЦІЯ ОПЕРАТОРА -=) ===
+Console.WriteLine("\n--- 2. Відписка локального методу (-= OnCatalogChanged) ---");
+service.Changed -= OnCatalogChanged;
+
+Console.WriteLine("Виконуємо операцію Receive (+5) після відписки:");
+service.Receive(created.Id, 5); // Ця операція тиха для консолі й файлу, але враховується лічильником
+Console.WriteLine($"Подій отримано лічильником після тихої операції: {changes}");
+
+// === 5. СЦЕНАРІЙ ВІДМОВИ (ВИНЯТОК НЕ ПОВИНЕН ГЕНЕРУВАТИ ПОДІЮ) ===
+Console.WriteLine("\n--- 3. Сценарій відмови (інваріант або неіснуючий Id) ---");
+try
 {
-    store.Add(Product.Create(created.Id, "SKU-DUP", "Дублікат", "шт", 10));
-});
-
-// Спроба викликати прихід для неіснуючого id
-TryDo("Операція Receive для неіснуючого Id", () =>
+    Console.WriteLine("Спроба виконати Receive для неіснуючого запису:");
+    service.Receive("UNKNOWN-ID", 10);
+}
+catch (Exception ex)
 {
-    service.Receive("NON-EXISTENT-ID", 100);
-});
+    Console.WriteLine($"  [Перехоплено виняток] {ex.GetType().Name}: {ex.Message}");
+    Console.WriteLine($"  Лічильник подій не змінився і дорівнює: {changes}");
+}
 
-// === 4. ДОДАТКОВЕ ЗАВДАННЯ: ПОШУК ЗА ПРЕДИКАТОМ ===
-Console.WriteLine("\n--- 4. Додаткове завдання: пошук за предикатом (Func<Product, bool>) ---");
-Console.WriteLine("Пошук товарів з одиницею виміру 'шт' і залишком > 50:");
-var filtered = service.Search(p => p.Unit == "шт" && p.Quantity > 50);
-foreach (var p in filtered)
+// === 6. ДЕЛЕГАТ ЗАМІСТЬ ПОДІЇ: ПОШУК ЧЕРЕЗ Func<Product, bool> ===
+Console.WriteLine("\n--- 4. Виклик FindAll із лямбда-предикатом (делегат Func) ---");
+Console.WriteLine("Товари з кількістю < 30:");
+var lowStock = service.FindAll(p => p.Quantity < 30);
+foreach (var p in lowStock)
 {
     Console.WriteLine($"  * [{p.Sku}] {p.Name,-25} : {p.Quantity} {p.Unit}");
-}
-
-static void TryDo(string title, Action action)
-{
-    try
-    {
-        action();
-        Console.WriteLine($"  [Провал] {title}: очікуваний виняток не відбувся!");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"  [Успішно перехоплено] {title}: {ex.GetType().Name} -> {ex.Message}");
-    }
 }
