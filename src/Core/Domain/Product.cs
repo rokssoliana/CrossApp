@@ -4,7 +4,7 @@ namespace Core.Domain;
 
 public sealed class Product
 {
-    private int _quantity;
+    private int _quantity;//— залишок сховано всередині. Його не можна змінити напряму ззовні (немає set).
 
     public string Id { get; }
     public string Sku { get; }
