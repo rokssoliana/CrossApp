@@ -78,3 +78,34 @@ foreach (var p in lowStock)
 {
     Console.WriteLine($"  * [{p.Sku}] {p.Name,-25} : {p.Quantity} {p.Unit}");
 }
+// === 7. ДОДАТКОВЕ ЗАВДАННЯ: INotificationSink (ConsoleSink та FileSink) ===
+Console.WriteLine("\n--- 5. Додаткове завдання: передача сповіщень через INotificationSink ---");
+
+var consoleSink = new ConsoleSink();
+var fileSink = new FileSink(logPath);
+
+var sinks = new List<INotificationSink> { consoleSink, fileSink };
+
+// Демонстрація передачі події у приймачі
+var testEvent = new CatalogChangedEventArgs("EXTRA-01", CatalogChangeKind.Added, 10, 10);
+foreach (var sink in sinks)
+{
+    sink.Notify(testEvent);
+}
+
+public sealed class ConsoleSink : INotificationSink
+{
+    public void Notify(CatalogChangedEventArgs e)
+    {
+        Console.WriteLine($"  [ConsoleSink] {e.At:HH:mm:ss} {e.Kind}: {e.Id} (дельта: {e.Delta}, залишок: {e.QuantityAfter})");
+    }
+}
+
+public sealed class FileSink(string path) : INotificationSink
+{
+    public void Notify(CatalogChangedEventArgs e)
+    {
+        var line = $"[FileSink] {e.At:HH:mm:ss} {e.Kind} {e.Id} дельта {e.Delta} залишок {e.QuantityAfter}";
+        File.AppendAllText(path, line + Environment.NewLine);
+    }
+}
