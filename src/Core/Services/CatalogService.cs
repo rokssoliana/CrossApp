@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Core.Abstractions;
 using Core.Domain;
 using Core.Events;
@@ -68,4 +73,24 @@ public sealed class CatalogService
 
     public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate) =>
         _store.List().Where(predicate).ToList();
+
+   public async Task<int> ImportAsync(
+        ICatalogImporter importer, 
+        string path, 
+        CancellationToken ct = default, 
+        IProgress<int>? progress = null)
+    {
+        var items = await importer.LoadAsync(path, ct, progress);
+        var added = 0;
+        foreach (var item in items)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_store.GetById(item.Id) is not null) continue; // Ідемпотентність імпорту
+
+            _store.Add(item);
+            OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+            added++;
+        }
+        return added;
+    }
 }

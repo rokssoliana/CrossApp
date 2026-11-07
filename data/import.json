@@ -1,0 +1,16 @@
+[
+  {
+    "Id": "imp-001",
+    "Sku": "SKU-IMP1",
+    "Name": "Асинхронний модуль імпорту",
+    "Unit": "шт",
+    "Quantity": 15
+  },
+  {
+    "Id": "imp-002",
+    "Sku": "SKU-IMP2",
+    "Name": "Кабель живлення CancellationToken",
+    "Unit": "м",
+    "Quantity": 50
+  }
+]
