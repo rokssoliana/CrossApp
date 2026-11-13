@@ -1,0 +1,54 @@
+@baseUrl = http://localhost:5080
+
+### 1. Health check
+GET {{baseUrl}}/health
+
+### 2. Отримати всі товари
+GET {{baseUrl}}/api/products
+
+### 3. Отримати дефіцитні товари
+GET {{baseUrl}}/api/products/low-stock?threshold=10
+
+### 4. Створити новий товар (201 Created)
+# @name createProduct
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "A-100",
+  "name": "Цемент М400",
+  "unit": "мішок",
+  "quantity": 40
+}
+
+### 5. Перевірка валідації (400 Bad Request)
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "",
+  "name": "X",
+  "unit": "",
+  "quantity": -1
+}
+
+### 6. Отримати створений товар за ID
+@createdId = {{createProduct.response.body.id}}
+GET {{baseUrl}}/api/products/{{createdId}}
+
+### 7. Оновити товар (200 OK)
+PUT {{baseUrl}}/api/products/{{createdId}}
+Content-Type: application/json
+
+{
+  "sku": "A-100-UPD",
+  "name": "Цемент М500",
+  "unit": "мішок",
+  "quantity": 55
+}
+
+### 8. Видалити товар (204 No Content)
+DELETE {{baseUrl}}/api/products/{{createdId}}
+
+### 9. Перевірити видалення (404 Not Found)
+GET {{baseUrl}}/api/products/{{createdId}}

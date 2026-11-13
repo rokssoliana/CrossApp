@@ -22,3 +22,8 @@
 * **PowerShell:** `$env:CROSSAPP_DATA_PATH = "C:\custom_data"`
 * **Bash / Linux:** `export CROSSAPP_DATA_PATH="/tmp/data"`
 * **User Secrets (локально):** `dotnet user-secrets set "Integration:ApiKey" "local-dev-key" --project src/Cli`
+## Запуск HTTP API (Лабораторна №10)
+* Запуск сервера: `dotnet run --project src/Api` (порт за замовчуванням: `http://localhost:5080`)
+* Документація Scalar UI (Development): `http://localhost:5080/scalar/v1`
+* Створення товару:
+  `curl.exe -i -X POST http://localhost:5080/api/products -H "Content-Type: application/json" -d '{\"sku\":\"A-100\",\"name\":\"Cement-M400\",\"unit\":\"bag\",\"quantity\":40}'`
