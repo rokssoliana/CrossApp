@@ -6,6 +6,7 @@ public sealed class BatchRow
     public string ProductId { get; set; } = "";
     public int Amount { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }
+    public string? Supplier { get; set; }
 
     public ProductRow Product { get; set; } = null!;
 }

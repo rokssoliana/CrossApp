@@ -33,6 +33,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("ReceivedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Supplier")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
