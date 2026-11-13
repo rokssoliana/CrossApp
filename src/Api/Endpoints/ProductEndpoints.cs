@@ -12,14 +12,31 @@ public static class ProductEndpoints
     {
         var group = app.MapGroup("/api/products").WithTags("Products");
 
-        // 1. GET списку всіх товарів
-        group.MapGet("/", (ICatalogStore store) =>
-            TypedResults.Ok(store.List().Select(MapToApiDto).ToList()));
+        // 1. GET списку товарів із пагінацією та пошуком (Додаткове завдання №1)
+        group.MapGet("/", (ICatalogStore store, int page = 1, int pageSize = 20, string? search = null) =>
+        {
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
 
-        // Додатковий маршрут варіанта "Склад": дефіцитні товари
-        group.MapGet("/low-stock", (ICatalogStore store, int threshold = 5) =>
-            TypedResults.Ok(store.Find(p => p.Quantity < threshold).Select(MapToApiDto).ToList()));
+            var query = store.List().AsEnumerable();
 
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(p =>
+                    p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var filtered = query.ToList();
+            var total = filtered.Count;
+            var items = filtered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(MapToApiDto)
+                .ToList();
+
+            return TypedResults.Ok(new PagedResult<ProductDto>(items, total));
+        });
         // 2. GET товару за id
         group.MapGet("/{id}", Results<Ok<ProductDto>, NotFound> (string id, ICatalogStore store) =>
             store.GetById(id) is { } found
