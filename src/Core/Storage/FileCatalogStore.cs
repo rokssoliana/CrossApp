@@ -1,3 +1,9 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Core.Abstractions;
 using Core.Domain;
@@ -7,44 +13,84 @@ namespace Core.Storage;
 
 public sealed class FileCatalogStore : ICatalogStore
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-    private readonly Dictionary<string, Product> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _path;
+    private readonly ConcurrentDictionary<string, Product> _cache = new();
     private bool _loaded;
+
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     public FileCatalogStore(string path)
     {
-        _path = Path.GetFullPath(path);
+        _path = path;
     }
 
     private void EnsureLoaded()
     {
         if (_loaded) return;
-
-        if (File.Exists(_path))
+        if (!File.Exists(_path))
         {
-            string json = File.ReadAllText(_path);
-            var dtos = JsonSerializer.Deserialize<List<ProductDto>>(json) ?? [];
-            foreach (var dto in dtos)
-            {
-                var p = Product.FromDto(dto);
-                _cache[p.Id] = p;
-            }
+            _loaded = true;
+            return;
         }
 
+        var dtos = JsonSerializer.Deserialize<List<ProductDto>>(File.ReadAllText(_path), Options) ?? [];
+        _cache.Clear();
+        foreach (var dto in dtos)
+        {
+            var product = Product.FromDto(dto);
+            _cache[product.Id] = product;
+        }
         _loaded = true;
     }
 
     private void Flush()
     {
-        string? dir = Path.GetDirectoryName(_path);
+        var dtos = _cache.Values.Select(product => product.ToDto()).ToList();
+        var tmp = _path + ".tmp";
+        var dir = Path.GetDirectoryName(_path);
         if (!string.IsNullOrEmpty(dir))
         {
             Directory.CreateDirectory(dir);
         }
+        File.WriteAllText(tmp, JsonSerializer.Serialize(dtos, Options));
+        File.Move(tmp, _path, overwrite: true);
+    }
 
-        var dtos = _cache.Values.Select(p => p.ToDto()).ToList();
-        File.WriteAllText(_path, JsonSerializer.Serialize(dtos, Options));
+    public void Add(Product item)
+    {
+        EnsureLoaded();
+        _cache[item.Id] = item;
+        Flush();
+    }
+
+    public Product? GetById(string id)
+    {
+        EnsureLoaded();
+        _cache.TryGetValue(id, out var item);
+        return item;
+    }
+
+    public void Update(Product item)
+    {
+        EnsureLoaded();
+        _cache[item.Id] = item;
+        Flush();
+    }
+
+    public bool Remove(string id)
+    {
+        EnsureLoaded();
+        if (_cache.TryRemove(id, out _))
+        {
+            Flush();
+            return true;
+        }
+        return false;
     }
 
     public IReadOnlyList<Product> List()
@@ -53,48 +99,15 @@ public sealed class FileCatalogStore : ICatalogStore
         return _cache.Values.ToList();
     }
 
-    public Product? GetById(string id)
-    {
-        EnsureLoaded();
-        return _cache.GetValueOrDefault(id);
-    }
-
-    public void Add(Product item)
-    {
-        ArgumentNullException.ThrowIfNull(item);
-        EnsureLoaded();
-
-        if (_cache.ContainsKey(item.Id))
-            throw new InvalidOperationException($"Запис з id={item.Id} уже існує у файлі.");
-
-        _cache.Add(item.Id, item);
-        Flush();
-    }
-
-    public void Update(Product item)
-    {
-        ArgumentNullException.ThrowIfNull(item);
-        EnsureLoaded();
-
-        if (!_cache.ContainsKey(item.Id))
-            throw new InvalidOperationException($"Неможливо оновити: запис з id={item.Id} не знайдено.");
-
-        _cache[item.Id] = item;
-        Flush();
-    }
-
-    public bool Remove(string id)
-    {
-        EnsureLoaded();
-        if (!_cache.Remove(id)) return false;
-
-        Flush();
-        return true;
-    }
-
     public IReadOnlyList<Product> Find(Func<Product, bool> predicate)
     {
         EnsureLoaded();
         return _cache.Values.Where(predicate).ToList();
+    }
+
+    public IReadOnlyList<Product> FindAll(Predicate<Product> match)
+    {
+        EnsureLoaded();
+        return _cache.Values.Where(p => match(p)).ToList();
     }
 }

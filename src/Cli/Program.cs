@@ -1,14 +1,17 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Core;
 using Core.Abstractions;
+using Core.Configuration;
 using Core.Events;
 using Core.Reports;
 using Core.Services;
 using Core.Storage;
+using Microsoft.Extensions.Configuration;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -19,15 +22,39 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
+// Збирання конфігураційного ланцюжка
+var envName = Environment.GetEnvironmentVariable("CROSSAPP_ENVIRONMENT") ?? "Development";
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .AddJsonFile($"appsettings.{envName}.json", optional: true)
+    .AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true)
+    .AddEnvironmentVariables(prefix: "CROSSAPP_")
+    .AddCommandLine(args)
+    .Build();
+
+var options = config.Get<AppOptions>() ?? new AppOptions();
+var legacy = Environment.GetEnvironmentVariable("CROSSAPP_DATA_PATH");
+
+var storage = new StorageOptions
+{
+    DataPath = string.IsNullOrWhiteSpace(legacy) ? options.Storage.DataPath : legacy,
+    FileName = options.Storage.FileName
+};
+
+// Перевірка конфігурації на старті (Додаткове завдання №1)
+if (!storage.Validate(out string configError))
+{
+    Console.WriteLine(configError);
+    Environment.Exit(2);
+}
+
+string fullDataPath = storage.ResolveFullPath(AppContext.BaseDirectory);
+string importPath = Path.Combine(AppContext.BaseDirectory, "data", "import.json");
+
 bool useFile = args.Contains("--file");
-
-// Завжди беремо корінну папку data відносно поточного робочого каталогу
-string dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
-string dataPath = Path.Combine(dataDir, "catalog.json");
-string importPath = Path.Combine(dataDir, "import.json");
-
 ICatalogStore store = useFile
-    ? new FileCatalogStore(dataPath)
+    ? new FileCatalogStore(fullDataPath)
     : new InMemoryCatalogStore(SampleData.Products());
 
 var service = new CatalogService(store);
@@ -39,6 +66,22 @@ try
 
     switch (command)
     {
+        case "export":
+            var apiKey = config["Integration:ApiKey"];
+            Console.WriteLine($"Файл даних: {fullDataPath}");
+            Console.WriteLine(apiKey is null ? "ApiKey: не заданий" : $"ApiKey: присутній, довжина {apiKey.Length}");
+
+            var itemsToExport = SampleData.Products();
+            var exportStore = new FileCatalogStore(fullDataPath);
+            int exportedCount = 0;
+            foreach (var item in itemsToExport)
+            {
+                exportStore.Add(item);
+                exportedCount++;
+            }
+            Console.WriteLine($"Експортовано {exportedCount} записи.");
+            return;
+
         case "import":
             if (!File.Exists(importPath))
             {
@@ -46,7 +89,6 @@ try
                 return;
             }
 
-            // Додаткове завдання: відстеження прогресу імпорту у реальному часі
             var progress = new Progress<int>(count =>
             {
                 Console.WriteLine($"  [Прогрес] Оброблено записів: {count}");
@@ -93,7 +135,6 @@ try
             return;
     }
 
-    // Основний сценарій подій
     service.Changed += OnCatalogChanged;
     int eventCount = 0;
     service.Changed += (_, _) => eventCount++;
