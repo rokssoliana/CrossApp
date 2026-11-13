@@ -17,13 +17,27 @@
 | `Storage:DataPath` | `data` | Відносна або абсолютна директорія для збереження JSON |
 | `Storage:FileName` | `items.json` | Назва файлу каталогу |
 | `Integration:ApiKey` | *(відсутнє)* | Секретний ключ доступу (збережено у User Secrets) |
+| `ConnectionStrings:AppDb` | `Data Source=data/app.db` | Рядок підключення до бази даних SQLite для `Api` |
 
 ### Приклади перевизначення конфігурації
 * **PowerShell:** `$env:CROSSAPP_DATA_PATH = "C:\custom_data"`
 * **Bash / Linux:** `export CROSSAPP_DATA_PATH="/tmp/data"`
 * **User Secrets (локально):** `dotnet user-secrets set "Integration:ApiKey" "local-dev-key" --project src/Cli`
+
 ## Запуск HTTP API (Лабораторна №10)
 * Запуск сервера: `dotnet run --project src/Api` (порт за замовчуванням: `http://localhost:5080`)
 * Документація Scalar UI (Development): `http://localhost:5080/scalar/v1`
 * Створення товару:
   `curl.exe -i -X POST http://localhost:5080/api/products -H "Content-Type: application/json" -d '{\"sku\":\"A-100\",\"name\":\"Cement-M400\",\"unit\":\"bag\",\"quantity\":40}'`
+
+## База даних SQLite та міграції EF Core (Лабораторна №11)
+* **Створення нової міграції:**
+  `dotnet ef migrations add <MigrationName> --project src/Infrastructure --startup-project src/Api`
+* **Застосування міграцій до бази даних:**
+  `dotnet ef database update --project src/Infrastructure --startup-project src/Api`
+* **Перегляд списку міграцій або SQL-скрипту:**
+  `dotnet ef migrations list --project src/Infrastructure --startup-project src/Api`
+  `dotnet ef migrations script --project src/Infrastructure --startup-project src/Api`
+* **Скидання бази даних (видалення файлу БД та повторне створення зі схеми міграцій):**
+  `dotnet ef database drop --force --project src/Infrastructure --startup-project src/Api`
+  `dotnet ef database update --project src/Infrastructure --startup-project src/Api`
