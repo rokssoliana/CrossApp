@@ -1,9 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Core;
 using Core.Abstractions;
 using Core.Configuration;
@@ -61,7 +56,7 @@ var service = new CatalogService(store);
 
 try
 {
-    var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "all";
+    var command = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? "all";
     var items = service.FindAll(_ => true);
 
     switch (command)

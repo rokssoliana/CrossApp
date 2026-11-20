@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Core.Abstractions;
 using Core.Domain;
 using Core.Dto;
@@ -13,8 +8,8 @@ namespace Core.Storage;
 public sealed class JsonCatalogImporter : ICatalogImporter
 {
     public async Task<IReadOnlyList<Product>> LoadAsync(
-        string path, 
-        CancellationToken ct = default, 
+        string path,
+        CancellationToken ct = default,
         IProgress<int>? progress = null)
     {
         ct.ThrowIfCancellationRequested();

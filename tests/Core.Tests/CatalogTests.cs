@@ -1,18 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Core;
 using Core.Events;
 using Core.Reports;
 using Core.Services;
 using Core.Storage;
-using Xunit;
 
 namespace Core.Tests;
 
+[Obsolete("Use EfCatalogStore from Infrastructure for persistent SQLite storage.")]
 public class CatalogTests
 {
     [Fact] // 1) Інваріант: відмова і незмінний стан при помилці

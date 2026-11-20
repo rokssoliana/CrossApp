@@ -53,10 +53,10 @@ public static class ProductEndpoints
         });
 
         // 2. GET товару за id
-        group.MapGet("/{id}", Results<Ok<ProductDto>, NotFound> (string id, ICatalogStore store) =>
+        group.MapGet("/{id}", Results<Ok<ProductDto>, ProblemHttpResult> (string id, ICatalogStore store) =>
             store.GetById(id) is { } found
                 ? TypedResults.Ok(MapToApiDto(found))
-                : TypedResults.NotFound());
+                : TypedResults.Problem(statusCode: 404, title: "Item not found", detail: $"Id {id}"));
 
         // 3. POST створення нового товару
         group.MapPost("/", Results<Created<ProductDto>, ValidationProblem> (SaveProductRequest request, ICatalogStore store) =>
@@ -72,13 +72,13 @@ public static class ProductEndpoints
         });
 
         // 4. PUT повне оновлення товару за id
-        group.MapPut("/{id}", Results<Ok<ProductDto>, NotFound, ValidationProblem> (string id, SaveProductRequest request, ICatalogStore store) =>
+        group.MapPut("/{id}", Results<Ok<ProductDto>, ProblemHttpResult, ValidationProblem> (string id, SaveProductRequest request, ICatalogStore store) =>
         {
             if (!request.TryValidate(out var errors))
                 return TypedResults.ValidationProblem(errors);
 
             if (store.GetById(id) is null)
-                return TypedResults.NotFound();
+                return TypedResults.Problem(statusCode: 404, title: "Item not found", detail: $"Id {id}");
 
             var replacement = Product.Create(id, request.Sku!, request.Name!, request.Unit!, request.Quantity);
             store.Update(replacement);
@@ -86,10 +86,10 @@ public static class ProductEndpoints
         });
 
         // 5. DELETE видалення товару за id
-        group.MapDelete("/{id}", Results<NoContent, NotFound> (string id, ICatalogStore store) =>
+        group.MapDelete("/{id}", Results<NoContent, ProblemHttpResult> (string id, ICatalogStore store) =>
             store.Remove(id)
                 ? TypedResults.NoContent()
-                : TypedResults.NotFound());
+                : TypedResults.Problem(statusCode: 404, title: "Item not found", detail: $"Id {id}"));
     }
 
     private static ProductDto MapToApiDto(Product p) =>
