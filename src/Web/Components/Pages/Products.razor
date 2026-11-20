@@ -1,0 +1,99 @@
+@page "/products"
+@rendermode InteractiveServer
+@inject ProductsApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Склад — Товари</PageTitle>
+
+<h3>Товари на складі</h3>
+
+<div class="d-flex gap-2 mb-3">
+    <a class="btn btn-primary" href="/products/new">Додати товар</a>
+    <input class="form-control w-auto" placeholder="Пошук за назвою або SKU..."
+           @bind="searchQuery" @bind:event="oninput" />
+    <button class="btn btn-outline-secondary" @onclick="LoadAsync">Знайти</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (items is null)
+{
+    <p><em>Завантаження...</em></p>
+}
+else if (items.Count == 0)
+{
+    <p>Записів ще немає.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Артикул</th>
+                <th>Назва</th>
+                <th>К-сть</th>
+                <th>Од.</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in items)
+            {
+                <tr class="@(item.Quantity < 10 ? "table-warning" : "")">
+                    <td>@item.Sku</td>
+                    <td>@item.Name</td>
+                    <td>
+                        @item.Quantity
+                        @if (item.Quantity < 10)
+                        {
+                            <span class="badge bg-warning text-dark ms-1">Малий залишок</span>
+                        }
+                    </td>
+                    <td>@item.Unit</td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-primary me-1" href="@($"/products/{item.Id}")">Редагувати</a>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item)">Видалити</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProductModel>? items;
+    private string? error;
+    private string? searchQuery;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            items = await Api.ListAsync(searchQuery);
+        }
+        catch (HttpRequestException)
+        {
+            error = "Api недоступний. Перевірте, чи запущено src/Api.";
+        }
+    }
+
+    private async Task DeleteAsync(ProductModel item)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Видалити товар «{item.Name}» ({item.Sku})?");
+        if (!confirmed) return;
+
+        var res = await Api.DeleteAsync(item.Id);
+        if (!res.Ok)
+        {
+            error = res.Message;
+            return;
+        }
+
+        items?.Remove(item);
+    }
+}

@@ -23,6 +23,12 @@ if (!Path.IsPathRooted(csb.DataSource))
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(csb.ConnectionString));
 builder.Services.AddScoped<ICatalogStore, EfCatalogStore>();
 
+var webOrigin = builder.Configuration["Cors:WebOrigin"] ?? "http://localhost:5090";
+builder.Services.AddCors(o => o.AddPolicy("web", p =>
+    p.WithOrigins(webOrigin)
+     .AllowAnyHeader()
+     .AllowAnyMethod()));
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -41,6 +47,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseCors("web");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapProducts();

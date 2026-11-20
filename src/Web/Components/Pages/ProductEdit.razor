@@ -1,0 +1,124 @@
+@page "/products/new"
+@page "/products/{Id}"
+@rendermode InteractiveServer
+@inject ProductsApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(IsEdit ? "Редагування товару" : "Новий товар")</PageTitle>
+
+<h3>@(IsEdit ? "Редагування товару" : "Новий товар")</h3>
+
+@if (notFound)
+{
+    <div class="alert alert-warning">Запис із таким ідентифікатором не знайдено (404).</div>
+    <a class="btn btn-secondary" href="/products">Повернутися до списку</a>
+}
+else if (model is null)
+{
+    <p><em>Завантаження...</em></p>
+}
+else
+{
+    @if (serverMessage is not null)
+    {
+        <div class="alert alert-danger">
+            <strong>@serverMessage</strong>
+            @if (fieldErrors is { Count: > 0 })
+            {
+                <ul class="mb-0 mt-1">
+                    @foreach (var kv in fieldErrors)
+                    {
+                        <li><strong>@kv.Key:</strong> @string.Join("; ", kv.Value)</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="product-form">
+        <DataAnnotationsValidator />
+
+        <div class="mb-3">
+            <label class="form-label">Артикул (SKU)</label>
+            <InputText class="form-control" @bind-Value="model.Sku" />
+            <ValidationMessage For="() => model.Sku" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Назва</label>
+            <InputText class="form-control" @bind-Value="model.Name" />
+            <ValidationMessage For="() => model.Name" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Одиниця виміру</label>
+            <InputText class="form-control" @bind-Value="model.Unit" />
+            <ValidationMessage For="() => model.Unit" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Кількість</label>
+            <InputNumber class="form-control" @bind-Value="model.Quantity" />
+            <ValidationMessage For="() => model.Quantity" />
+        </div>
+
+        <button type="submit" class="btn btn-success me-2">Зберегти</button>
+        <a class="btn btn-secondary" href="/products">Скасувати</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private ProductModel? model;
+    private bool notFound;
+    private string? serverMessage;
+    private Dictionary<string, string[]>? fieldErrors;
+
+    private bool IsEdit => !string.IsNullOrWhiteSpace(Id);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        serverMessage = null;
+        fieldErrors = null;
+        notFound = false;
+
+        if (!IsEdit)
+        {
+            model = new ProductModel();
+            return;
+        }
+
+        try
+        {
+            model = await Api.FindAsync(Id!);
+            if (model is null)
+                notFound = true;
+        }
+        catch (HttpRequestException)
+        {
+            serverMessage = "Api недоступний. Перевірте, чи запущено src/Api.";
+            model = new ProductModel();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (model is null) return;
+        serverMessage = null;
+        fieldErrors = null;
+
+        var result = IsEdit
+            ? await Api.UpdateAsync(model)
+            : await Api.CreateAsync(model);
+
+        if (result.Ok)
+        {
+            Nav.NavigateTo("/products");
+            return;
+        }
+
+        serverMessage = result.Message;
+        fieldErrors = result.Errors;
+    }
+}
