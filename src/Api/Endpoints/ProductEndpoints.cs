@@ -12,8 +12,14 @@ public static class ProductEndpoints
     {
         var group = app.MapGroup("/api/products").WithTags("Products");
 
-        // 1. GET списку товарів із пагінацією та пошуком (Додаткове завдання №1)
-        group.MapGet("/", (ICatalogStore store, int page = 1, int pageSize = 20, string? search = null) =>
+        // 1. GET списку товарів із пагінацією, пошуком та сортуванням
+        group.MapGet("/", (
+            ICatalogStore store,
+            int page = 1,
+            int pageSize = 20,
+            string? search = null,
+            string? sortBy = null,
+            string? sortDir = "asc") =>
         {
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 1, 100);
@@ -27,6 +33,14 @@ public static class ProductEndpoints
                     p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
 
+            var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+            query = sortBy?.ToLowerInvariant() switch
+            {
+                "sku" => desc ? query.OrderByDescending(p => p.Sku) : query.OrderBy(p => p.Sku),
+                "quantity" => desc ? query.OrderByDescending(p => p.Quantity) : query.OrderBy(p => p.Quantity),
+                _ => desc ? query.OrderByDescending(p => p.Name) : query.OrderBy(p => p.Name)
+            };
+
             var filtered = query.ToList();
             var total = filtered.Count;
             var items = filtered
@@ -37,6 +51,7 @@ public static class ProductEndpoints
 
             return TypedResults.Ok(new PagedResult<ProductDto>(items, total));
         });
+
         // 2. GET товару за id
         group.MapGet("/{id}", Results<Ok<ProductDto>, NotFound> (string id, ICatalogStore store) =>
             store.GetById(id) is { } found

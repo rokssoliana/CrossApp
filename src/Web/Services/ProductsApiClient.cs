@@ -6,12 +6,24 @@ namespace Web.Services;
 
 public sealed class ProductsApiClient(HttpClient http)
 {
-    public async Task<List<ProductModel>> ListAsync(string? search = null, CancellationToken ct = default)
+    public async Task<List<ProductModel>> ListAsync(
+        string? search = null,
+        string? sortBy = null,
+        string? sortDir = "asc",
+        CancellationToken ct = default)
     {
-        var url = string.IsNullOrWhiteSpace(search)
-            ? "api/products?page=1&pageSize=100"
-            : $"api/products?page=1&pageSize=100&search={Uri.EscapeDataString(search.Trim())}";
+        var queryParams = new List<string> { "page=1", "pageSize=100" };
 
+        if (!string.IsNullOrWhiteSpace(search))
+            queryParams.Add($"search={Uri.EscapeDataString(search.Trim())}");
+
+        if (!string.IsNullOrWhiteSpace(sortBy))
+            queryParams.Add($"sortBy={Uri.EscapeDataString(sortBy)}");
+
+        if (!string.IsNullOrWhiteSpace(sortDir))
+            queryParams.Add($"sortDir={Uri.EscapeDataString(sortDir)}");
+
+        var url = $"api/products?{string.Join("&", queryParams)}";
         var page = await http.GetFromJsonAsync<PagedResponse<ProductModel>>(url, ct);
         return page?.Items ?? [];
     }

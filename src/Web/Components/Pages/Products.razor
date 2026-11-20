@@ -1,5 +1,6 @@
 @page "/products"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject ProductsApiClient Api
 @inject IJSRuntime JS
 
@@ -31,9 +32,15 @@ else
     <table class="table table-striped align-middle">
         <thead>
             <tr>
-                <th>Артикул</th>
-                <th>Назва</th>
-                <th>К-сть</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("sku")'>
+                    Артикул @SortIcon("sku")
+                </th>
+                <th style="cursor:pointer" @onclick='() => SortBy("name")'>
+                    Назва @SortIcon("name")
+                </th>
+                <th style="cursor:pointer" @onclick='() => SortBy("quantity")'>
+                    К-сть @SortIcon("quantity")
+                </th>
                 <th>Од.</th>
                 <th>Дії</th>
             </tr>
@@ -66,15 +73,42 @@ else
     private List<ProductModel>? items;
     private string? error;
     private string? searchQuery;
+    private string sortBy = "name";
+    private string sortDir = "asc";
+    private CancellationTokenSource? _cts;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
+    private async Task SortBy(string column)
+    {
+        if (sortBy == column)
+            sortDir = sortDir == "asc" ? "desc" : "asc";
+        else
+        {
+            sortBy = column;
+            sortDir = "asc";
+        }
+        await LoadAsync();
+    }
+
+    private string SortIcon(string column) =>
+        sortBy != column ? "" : (sortDir == "asc" ? "▲" : "▼");
+
     private async Task LoadAsync()
     {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
         error = null;
         try
         {
-            items = await Api.ListAsync(searchQuery);
+            items = await Api.ListAsync(searchQuery, sortBy, sortDir, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Запит скасовано через новий пошук або вихід зі сторінки
         }
         catch (HttpRequestException)
         {
@@ -95,5 +129,11 @@ else
         }
 
         items?.Remove(item);
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
     }
 }
