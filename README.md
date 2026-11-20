@@ -41,3 +41,15 @@
 * **Скидання бази даних (видалення файлу БД та повторне створення зі схеми міграцій):**
   `dotnet ef database drop --force --project src/Infrastructure --startup-project src/Api`
   `dotnet ef database update --project src/Infrastructure --startup-project src/Api`
+  ## Архітектура та залежності шарів (Лабораторна №13)
+
+* `Core` — доменна модель, інваріанти, винятки (`DomainException`) та інтерфейси сховищ (не залежить від жодних внутрішніх проєктів чи зовнішніх пакетів).
+* `Infrastructure` -> `Core` (EF Core, `AppDbContext`, міграції та реалізації репозиторіїв SQLite).
+* `Api` -> `Core`, `Infrastructure` (Minimal API, DTO, мапінг, обробка помилок `ProblemDetails`, конфігурація DI).
+* `Cli` -> `Core`, `Infrastructure` (консольний клієнт).
+* `Web` -> лише HTTP-контракт `Api` (Blazor Web App `InteractiveServer`).
+* `Core.Tests` -> `Core` (модульні тести доменної логіки).
+
+## Вебклієнт Blazor (Лабораторна №12)
+* Запуск API: `dotnet run --project src/Api --urls http://localhost:5080`
+* Запуск Web: `dotnet run --project src/Web --urls http://localhost:5090` (маршрут: `/products`)
