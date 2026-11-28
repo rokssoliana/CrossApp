@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Api.Endpoints;
 using Core;
 using Core.Abstractions;
@@ -16,6 +16,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
 
 var raw = builder.Configuration.GetConnectionString("AppDb") ?? "Data Source=data/app.db";
 var csb = new SqliteConnectionStringBuilder(raw);
@@ -39,10 +40,7 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    if (app.Environment.IsDevelopment())
-    {
-        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
-    }
+    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
 
 app.UseExceptionHandler(exceptionApp =>
@@ -66,7 +64,7 @@ app.UseExceptionHandler(exceptionApp =>
             await Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Duplicate item",
-                detail: "РўРѕРІР°СЂ С–Р· С‚Р°РєРёРј Р°СЂС‚РёРєСѓР»РѕРј (SKU) РІР¶Рµ С–СЃРЅСѓС”.").ExecuteAsync(context);
+                detail: "Товар із таким артикулом вже існує.").ExecuteAsync(context);
             return;
         }
 
@@ -86,7 +84,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("web");
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapHealthChecks("/health");
 app.MapProducts();
 
 app.Run();
